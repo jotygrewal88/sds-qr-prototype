@@ -50,6 +50,7 @@ import {
   mockLocations,
   mockUsers,
 } from "@/lib/mockData";
+import { AccessPointFormModal } from "@/components/admin/AccessPointFormModal";
 import { QRDetailModal } from "@/components/admin/QRDetailModal";
 import { cn } from "@/lib/utils";
 import type { AccessPoint, AccessPointType, Document } from "@/lib/types";
@@ -135,6 +136,16 @@ function getSortValue(accessPoint: AccessPoint, sortKey: SortKey) {
   }
 
   return accessPoint.createdAt;
+}
+
+function createAccessPointId(name: string) {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  return `ap-${slug || "access-point"}-${Date.now()}`;
 }
 
 function TypeBadge({ type }: { type: AccessPointType }) {
@@ -260,6 +271,7 @@ function SelectOption({
 }
 
 export default function AccessPointsPage() {
+  const [accessPoints, setAccessPoints] = useState<AccessPoint[]>(mockAccessPoints);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<StatusFilter[]>([
     "active",
@@ -277,39 +289,42 @@ export default function AccessPointsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedAccessPoint, setSelectedAccessPoint] =
     useState<AccessPoint | null>(null);
+  const [formModalOpen, setFormModalOpen] = useState(false);
+  const [editingAccessPoint, setEditingAccessPoint] =
+    useState<AccessPoint | null>(null);
 
   const createdByOptions = useMemo(() => {
     const createdByIds = new Set(
-      mockAccessPoints.map((accessPoint) => accessPoint.createdById),
+      accessPoints.map((accessPoint) => accessPoint.createdById),
     );
 
     return mockUsers.filter((user) => createdByIds.has(user.id));
-  }, []);
+  }, [accessPoints]);
 
   const formTemplateOptions = useMemo(() => {
     const templateIds = new Set(
-      mockAccessPoints.flatMap(
+      accessPoints.flatMap(
         (accessPoint) => accessPoint.formTemplateIds ?? [],
       ),
     );
 
     return mockFormTemplates.filter((template) => templateIds.has(template.id));
-  }, []);
+  }, [accessPoints]);
 
   const locationOptions = useMemo(() => {
     const locationIds = new Set(
-      mockAccessPoints
+      accessPoints
         .map((accessPoint) => accessPoint.locationId)
         .filter((locationId): locationId is string => Boolean(locationId)),
     );
 
     return mockLocations.filter((location) => locationIds.has(location.id));
-  }, []);
+  }, [accessPoints]);
 
   const filteredAccessPoints = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return mockAccessPoints
+    return accessPoints
       .filter((accessPoint) => {
         const accessPointTemplateIds: readonly string[] =
           accessPoint.formTemplateIds ?? [];
@@ -374,6 +389,7 @@ export default function AccessPointsPage() {
   }, [
     createdFrom,
     createdTo,
+    accessPoints,
     includeArchived,
     searchQuery,
     selectedCreatedById,
@@ -426,6 +442,52 @@ export default function AccessPointsPage() {
     event.stopPropagation();
   };
 
+  const openCreateModal = () => {
+    setEditingAccessPoint(null);
+    setFormModalOpen(true);
+  };
+
+  const openEditModal = (accessPoint: AccessPoint) => {
+    setEditingAccessPoint(accessPoint);
+    setFormModalOpen(true);
+  };
+
+  const closeFormModal = () => {
+    setFormModalOpen(false);
+    setEditingAccessPoint(null);
+  };
+
+  const handleSaveAccessPoint = (accessPoint: AccessPoint) => {
+    const savedAccessPoint: AccessPoint = editingAccessPoint
+      ? {
+          ...editingAccessPoint,
+          ...accessPoint,
+          id: editingAccessPoint.id,
+          createdAt: editingAccessPoint.createdAt,
+          createdById: editingAccessPoint.createdById,
+          status: editingAccessPoint.status,
+        }
+      : {
+          ...accessPoint,
+          id: createAccessPointId(accessPoint.name),
+          createdAt: new Date().toISOString().slice(0, 10),
+          createdById: "user-joty-grewal",
+          status: "active",
+        };
+
+    setAccessPoints((current) =>
+      editingAccessPoint
+        ? current.map((currentAccessPoint) =>
+            currentAccessPoint.id === savedAccessPoint.id
+              ? savedAccessPoint
+              : currentAccessPoint,
+          )
+        : [savedAccessPoint, ...current],
+    );
+    closeFormModal();
+    setSelectedAccessPoint(savedAccessPoint);
+  };
+
   return (
     <section className="space-y-5">
       <div className="flex items-start justify-between gap-6">
@@ -448,7 +510,11 @@ export default function AccessPointsPage() {
               className="h-9 rounded-md border-slate-200 bg-white pl-9 text-sm shadow-xs"
             />
           </div>
-          <Button className="h-9 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-xs hover:bg-blue-700">
+          <Button
+            type="button"
+            onClick={openCreateModal}
+            className="h-9 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white shadow-xs hover:bg-blue-700"
+          >
             + Create Access Point
           </Button>
           <Button
@@ -859,7 +925,11 @@ export default function AccessPointsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" onClick={stopRowClick}>
                           <DropdownMenuItem>View details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit access point</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => openEditModal(accessPoint)}
+                          >
+                            Edit access point
+                          </DropdownMenuItem>
                           <DropdownMenuItem>Archive</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -875,6 +945,12 @@ export default function AccessPointsPage() {
         accessPoint={selectedAccessPoint}
         open={Boolean(selectedAccessPoint)}
         onClose={() => setSelectedAccessPoint(null)}
+      />
+      <AccessPointFormModal
+        accessPoint={editingAccessPoint}
+        open={formModalOpen}
+        onClose={closeFormModal}
+        onSave={handleSaveAccessPoint}
       />
     </section>
   );
