@@ -50,6 +50,7 @@ import {
   mockLocations,
   mockUsers,
 } from "@/lib/mockData";
+import { QRDetailModal } from "@/components/admin/QRDetailModal";
 import { cn } from "@/lib/utils";
 import type { AccessPoint, AccessPointType, Document } from "@/lib/types";
 
@@ -274,6 +275,8 @@ export default function AccessPointsPage() {
   const [createdTo, setCreatedTo] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [selectedAccessPoint, setSelectedAccessPoint] =
+    useState<AccessPoint | null>(null);
 
   const createdByOptions = useMemo(() => {
     const createdByIds = new Set(
@@ -751,7 +754,7 @@ export default function AccessPointsPage() {
                 return (
                   <TableRow
                     key={accessPoint.id}
-                    onClick={() => console.log(accessPoint.id)}
+                    onClick={() => setSelectedAccessPoint(accessPoint)}
                     className="h-16 cursor-pointer border-b border-slate-100 hover:bg-slate-50"
                   >
                     <TableCell className="px-4 py-3 font-semibold text-slate-800">
@@ -868,6 +871,11 @@ export default function AccessPointsPage() {
           </TableBody>
         </Table>
       </div>
+      <QRDetailModal
+        accessPoint={selectedAccessPoint}
+        open={Boolean(selectedAccessPoint)}
+        onClose={() => setSelectedAccessPoint(null)}
+      />
     </section>
   );
 }
